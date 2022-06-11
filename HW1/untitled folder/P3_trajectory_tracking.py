@@ -60,32 +60,6 @@ class TrajectoryTracker:
         ########## Code starts here ##########
         V = 0
         om = 0
-
-        om_prev = self.om_prev
-
-        kpx = self.kpx
-        kpy = self.kpy
-        kdx = self.kdx
-        kdy = self.kdy
-
-        V_prev = self.V_prev
-        
-        if V_prev < V_PREV_THRES:
-           V_prev =  V_PREV_THRES
-
-        
-
-        xd = V_prev * np.cos(th)
-        yd = V_prev * np.sin(th)
-
-        u1 = xdd_d + kpx*(x_d - x) + kdx*(xd_d - xd)
-        u2 = ydd_d + kpy*(y_d - y) + kdy*(yd_d - yd)
-
-        
-        thd = (u2-u1*np.sin(th)/np.cos(th))/(V_prev*np.cos(th)+V_prev*np.sin(th)**2/np.cos(th))
-        Vd = u1/np.cos(th)+V_prev*np.sin(th)*thd/np.cos(th)
-        V = Vd*dt+V_prev
-        om = thd
         ########## Code ends here ##########
 
         # apply control limits

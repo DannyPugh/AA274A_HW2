@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from numpy.lib.function_base import select
 from utils import plot_line_segments, line_line_intersection
 
 class RRT(object):
@@ -62,7 +63,6 @@ class RRT(object):
         Constructs an RRT rooted at self.x_init with the aim of producing a
         dynamically-feasible and obstacle-free trajectory from self.x_init
         to self.x_goal.
-
         Inputs:
             eps: maximum steering distance
             max_iters: maximum number of RRT iterations (early termination
@@ -74,22 +74,17 @@ class RRT(object):
             None officially (just plots), but see the "Intermediate Outputs"
             descriptions below
         """
-
         state_dim = len(self.x_init)
-
         # V stores the states that have been added to the RRT (pre-allocated at its maximum size
         # since numpy doesn't play that well with appending/extending)
         V = np.zeros((max_iters + 1, state_dim))
         V[0,:] = self.x_init    # RRT is rooted at self.x_init
         n = 1                   # the current size of the RRT (states accessible as V[range(n),:])
-
         # P stores the parent of each state in the RRT. P[0] = -1 since the root has no parent,
         # P[1] = 0 since the parent of the first additional state added to the RRT must have been
         # extended from the root, in general 0 <= P[i] < i for all i < n
         P = -np.ones(max_iters + 1, dtype=int)
-
         success = False
-
         ## Intermediate Outputs
         # You must update and/or populate:
         #    - V, P, n: the represention of the planning tree
@@ -97,15 +92,42 @@ class RRT(object):
         #    - self.path: if success is True, then must contain list of states (tree nodes)
         #          [x_init, ..., x_goal] such that the global trajectory made by linking steering
         #          trajectories connecting the states in order is obstacle-free.
-
         ## Hints:
         #   - use the helper functions find_nearest, steer_towards, and is_free_motion
         #   - remember that V and P always contain max_iters elements, but only the first n
         #     are meaningful! keep this in mind when using the helper functions!
         #   - the order in which you pass in arguments to steer_towards and is_free_motion is important
-
         ########## Code starts here ##########
-        
+
+        for k in range(max_iters):
+            #uniform random sample
+            z = np.random.uniform(0,1)
+            if z < goal_bias:
+                x_rand = self.x_goal
+            else:
+                x_rand = np.random.uniform(self.statespace_lo,self.statespace_hi)
+
+            x_near_index = self.find_nearest(V[range(n)], x_rand)
+            x_near = V[x_near_index]
+
+            x_new = self.steer_towards(x_near, x_rand, eps)
+
+            if self.is_free_motion(self.obstacles, x_near, x_new):
+                V[n] = x_new
+                P[n] = x_near_index
+                n = n + 1
+                if (x_new == self.x_goal).all():
+                    self.path = [V[n-1]] #np.zeros((1,state_dim))
+                    x_current = n - 1
+                    #self.path[0] = V[n-1]
+                    for i in range(n):
+                        if x_current == 0:
+                            break
+                        self.path.insert(0,V[P[x_current]])
+                        x_current = P[x_current]
+                    success = True
+                    break
+
         ########## Code ends here ##########
 
         plt.figure()
@@ -115,7 +137,7 @@ class RRT(object):
             if shortcut:
                 self.plot_path(color="purple", linewidth=2, label="Original solution path")
                 self.shortcut_path()
-                self.plot_path(color="green", linewidth=2, label="Shortcut solution path")
+                self.plot_path(color="green", linewidth=4, label="Shortcut solution path")
             else:
                 self.plot_path(color="green", linewidth=2, label="Solution path")
             plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.03), fancybox=True, ncol=3)
@@ -143,7 +165,17 @@ class RRT(object):
             None, but should modify self.path
         """
         ########## Code starts here ##########
-        
+        success = False
+        while not(success):
+            success = True
+            for x in range(1,len(self.path)-1):
+                if (self.is_free_motion(self.obstacles, self.path[x-1], self.path[x+1])):
+                    if not((self.path[x] == self.x_goal).all()) and not((self.path[x] == self.x_init).all()): 
+                        self.path.pop(x)
+                        success = False
+                        break
+
+
         ########## Code ends here ##########
 
 class GeometricRRT(RRT):
@@ -156,15 +188,29 @@ class GeometricRRT(RRT):
         # Consult function specification in parent (RRT) class.
         ########## Code starts here ##########
         # Hint: This should take one line.
-        
+        min_dist = V[0]-x
+        min_V_index = 0
+        for i in range(len(V)):
+            dist = V[i]-x
+            norm_min_dist = np.linalg.norm(min_dist)
+            norm_dist = np.linalg.norm(dist)
+            if norm_dist < norm_min_dist:
+                min_dist = dist
+                min_V_index = i
+        return min_V_index
         ########## Code ends here ##########
 
     def steer_towards(self, x1, x2, eps):
         # Consult function specification in parent (RRT) class.
         ########## Code starts here ##########
         # Hint: This should take one line.
-        
-        ########## Code ends here ##########
+        dist = np.linalg.norm(x1-x2)
+        if dist < eps:
+            x_new = x2
+        else:
+            x_new = x1 + (x2-x1)*eps/dist
+        return x_new
+########## Code ends here ##########
 
     def is_free_motion(self, obstacles, x1, x2):
         motion = np.array([x1, x2])
@@ -203,7 +249,16 @@ class DubinsRRT(RRT):
         # HINT: The order of arguments for dubins.shortest_path() is important for DubinsRRT.
         import dubins
         ########## Code starts here ##########
-        
+        min_dist = dubins.shortest_path(V[0],x,self.turning_radius)
+        min_V_index = 0
+        for i in range(len(V)):
+            this_dist = dubins.shortest_path(V[i],x,self.turning_radius)
+            min_path = min_dist.path_length()
+            this_path = this_dist.path_length()
+            if this_path < min_path:
+                min_dist = this_dist
+                min_V_index = i
+        return min_V_index
         ########## Code ends here ##########
 
     def steer_towards(self, x1, x2, eps):
@@ -219,7 +274,21 @@ class DubinsRRT(RRT):
         """
         # HINT: You may find the functions dubins.shortest_path(), d_path.path_length(), and d_path.sample_many() useful
         ########## Code starts here ##########
-        
+        d_path = dubins.shortest_path(x1,x2,1.001*self.turning_radius)
+        path_arc_length = d_path.path_length()
+        if path_arc_length > eps:
+            many_path = d_path.sample_many(0.1)
+            pose = many_path[0]
+            dist = many_path[1]
+            for i in range(len(dist)):
+                if dist[i] <= eps:
+                    new_pose = np.array(pose[i])
+                else:
+                    #print("Done")
+                    break      
+        else: 
+            new_pose = x2
+        return new_pose
         ########## Code ends here ##########
 
     def is_free_motion(self, obstacles, x1, x2, resolution = np.pi/6):
@@ -254,3 +323,43 @@ class DubinsRRT(RRT):
             new_pts = d_path.sample_many(self.turning_radius*resolution)[0]
             pts.extend(new_pts)
         plt.plot([x for x, y, th in pts], [y for x, y, th in pts], **kwargs)
+
+
+## TEST HARNES
+'''
+plt.rcParams['figure.figsize'] = [8, 8] # Change default figure size
+
+MAZE = np.array([
+    (( 5, 5), (-5, 5)),
+    ((-5, 5), (-5,-5)),
+    ((-5,-5), ( 5,-5)),
+    (( 5,-5), ( 5, 5)),
+    ((-3,-3), (-3,-1)),
+    ((-3,-3), (-1,-3)),
+    (( 3, 3), ( 3, 1)),
+    (( 3, 3), ( 1, 3)),
+    (( 1,-1), ( 3,-1)),
+    (( 3,-1), ( 3,-3)),
+    ((-1, 1), (-3, 1)),
+    ((-3, 1), (-3, 3)),
+    ((-1,-1), ( 1,-3)),
+    ((-1, 5), (-1, 2)),
+    (( 0, 0), ( 1, 1))
+])
+
+# try changing these!
+x_init = [-4,-4] # reset to [-4,-4] when saving results for submission
+x_goal = [4,4] # reset to [4,4] when saving results for submission
+
+grrt = GeometricRRT([-5,-5], [5,5], x_init, x_goal, MAZE)
+grrt.solve(1.0, 2000)
+
+grrt.solve(1.0, 2000, shortcut=True)
+
+x_init = [-4,-4,0]
+x_goal = [4,4,np.pi/2]
+
+drrt = DubinsRRT([-5,-5,0], [5,5,2*np.pi], x_init, x_goal, MAZE, .5)
+drrt.solve(1.0, 1000, shortcut=True)
+
+'''

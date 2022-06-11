@@ -39,7 +39,18 @@ class AStar(object):
               useful here
         """
         ########## Code starts here ##########
-        
+        is_free = False
+        occupancy = self.occupancy
+        xmin = 0
+        ymin = 0
+        xmax = occupancy.width
+        ymax = occupancy.height
+        inside_y_boundaries = ymin <= x[1] and ymax >= x[1]
+        inside_x_boundaries = xmin <= x[0] and xmax >= x[0]
+        free_of_obstacles = occupancy.is_free(x)
+        if (free_of_obstacles == True and inside_x_boundaries == True and inside_y_boundaries == True):
+            is_free = True
+        return is_free
         ########## Code ends here ##########
 
     def distance(self, x1, x2):
@@ -54,7 +65,7 @@ class AStar(object):
         HINT: This should take one line. Tuples can be converted to numpy arrays using np.array().
         """
         ########## Code starts here ##########
-        
+        return np.linalg.norm(np.array(x1) - np.array(x2))
         ########## Code ends here ##########
 
     def snap_to_grid(self, x):
@@ -87,7 +98,20 @@ class AStar(object):
         """
         neighbors = []
         ########## Code starts here ##########
-        
+        resolution = self.resolution
+        neighbors_xy =[
+            self.snap_to_grid((x[0] + resolution, x[1]                )),
+            self.snap_to_grid((x[0] - resolution, x[1]                )),
+            self.snap_to_grid((x[0] + resolution, x[1] + resolution   )),
+            self.snap_to_grid((x[0] - resolution, x[1] + resolution   )),
+            self.snap_to_grid((x[0] - resolution, x[1] - resolution   )),
+            self.snap_to_grid((x[0] + resolution, x[1] - resolution   )),
+            self.snap_to_grid((x[0]             , x[1] - resolution   )),
+            self.snap_to_grid((x[0]             , x[1] + resolution   ))
+        ]
+        for index in range(len(neighbors_xy)):
+            if (self.is_free(neighbors_xy[index])):
+                neighbors.append(neighbors_xy[index])
         ########## Code ends here ##########
         return neighbors
 
@@ -152,7 +176,29 @@ class AStar(object):
                 set membership efficiently using the syntax "if item in set".
         """
         ########## Code starts here ##########
-        
+        success = False
+        while len(self.open_set) > 0:
+            x_current = self.find_best_est_cost_through()
+            if x_current == self.x_goal:
+                self.path = self.reconstruct_path()
+                #self.path = np.array(self.path)
+                success = True
+                break
+                self.path = np.array(self.path)
+            self.open_set.remove(x_current)
+            self.closed_set.add(x_current)
+            for neighbor in self.get_neighbors(x_current):
+                if neighbor in self.closed_set:
+                    continue
+                tentative_cost_to_arrive = self.cost_to_arrive[x_current] + self.distance(x_current, neighbor)
+                if neighbor not in self.open_set:
+                    self.open_set.add(neighbor)
+                elif tentative_cost_to_arrive > self.cost_to_arrive[neighbor]:
+                    continue
+                self.came_from[neighbor] = x_current
+                self.cost_to_arrive[neighbor] = tentative_cost_to_arrive
+                self.est_cost_through[neighbor] = tentative_cost_to_arrive + self.distance(neighbor, self.x_goal)
+        return success
         ########## Code ends here ##########
 
 class DetOccupancyGrid2D(object):
@@ -180,8 +226,8 @@ class DetOccupancyGrid2D(object):
     def plot(self, fig_num=0):
         """Plots the space and its obstacles"""
         fig = plt.figure(fig_num)
-        for obs in self.obstacles:
-            ax = fig.add_subplot(111, aspect='equal')
+        ax = fig.add_subplot(111, aspect='equal')
+        for obs in self.obstacles:  
             ax.add_patch(
             patches.Rectangle(
             obs[0],

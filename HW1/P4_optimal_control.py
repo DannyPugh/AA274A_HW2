@@ -1,148 +1,103 @@
 import numpy as np
-import math
-import scikits.bvp_solver
 import matplotlib.pyplot as plt
+from scipy.optimize import minimize, Bounds
 from utils import *
 
-dt = 0.005
+N = 20  # Number of time discretization nodes (0, 1, ... N).
+s_dim = 3  # State dimension; 3 for (x, y, th).
+u_dim = 2  # Control dimension; 2 for (V, om).
+v_max = 0.5  # Maximum linear velocity.
+om_max = 1.0  # Maximum angular velocity.
 
-def ode_fun(tau, z):
-    """
-    This function computes the dz given tau and z. It is used in the bvp solver.
-    Inputs:
-        tau: the independent variable. This must be the first argument.
-        z: the state vector. The first three states are [x, y, th, ...]
-    Output:
-        dz: the state derivative vector. Returns a numpy array.
-    """
-    ########## Code starts here ##########
+s_0 = np.array([0, 0, -np.pi / 2])  # Initial state.
+s_f = np.array([5, 5, -np.pi / 2])  # Final state.
+
+
+def pack_decision_variables(t_f, s, u):
+    """Packs decision variables (final time, states, controls) into a 1D vector.
     
-    ########## Code ends here ##########
-    return dz
+    Args:
+        t_f: Final time, a scalar.
+        s: States, an array of shape (N + 1, s_dim).
+        u: Controls, an array of shape (N, u_dim).
 
-
-def bc_fun(za, zb):
+    Returns:
+        An array `z` of shape (1 + (N + 1) * s_dim + N * u_dim,).
     """
-    This function computes boundary conditions. It is used in the bvp solver.
-    Inputs:
-        za: the state vector at the initial time
-        zb: the state vector at the final time
-    Output:
-        bca: tuple of boundary conditions at initial time
-        bcb: tuple of boundary conditions at final time
-    """
-    # final goal pose
-    xf = 5
-    yf = 5
-    thf = -np.pi/2.0
-    xf = [xf, yf, thf]
-    # initial pose
-    x0 = [0, 0, -np.pi/2.0]
+    return np.concatenate([[t_f], s.ravel(), u.ravel()])
 
-    ########## Code starts here ##########
+
+def unpack_decision_variables(z):
+    """Unpacks a 1D vector into decision variables (final time, states, controls).
     
-    ########## Code ends here ##########
-    return (bca, bcb)
+    Args:
+        z: An array of shape (1 + (N + 1) * s_dim + N * u_dim,).
 
-def solve_bvp(problem_inputs, initial_guess):
+    Returns:
+        t_f: Final time, a scalar.
+        s: States, an array of shape (N + 1, s_dim).
+        u: Controls, an array of shape (N, u_dim).
     """
-    This function solves the bvp_problem.
-    Inputs:
-        problem_inputs: a dictionary of the arguments needs to define the problem
-                        num_ODE, num_parameters, num_left_boundary_conditions,
-                        boundary_points, function, boundary_conditions
-        initial_guess: initial guess of the solution
-    Output:
-        z: a numpy array of the solution. It is of size [time, state_dim]
+    t_f = z[0]
+    s = z[1:1 + (N + 1) * s_dim].reshape(N + 1, s_dim)
+    u = z[-N * u_dim:].reshape(N, u_dim)
+    return t_f, s, u
 
-    Read this documentation -- https://pythonhosted.org/scikits.bvp_solver/tutorial.html
-    """
-    problem = scikits.bvp_solver.ProblemDefinition(**problem_inputs)
-    soln = scikits.bvp_solver.solve(problem, solution_guess=initial_guess)
 
-    # Test if time is reversed in bvp_solver solution
-    flip, tf = check_flip(soln(0))
-    t = np.arange(0,tf,dt)
-    z = soln(t/tf)
-    if flip:
-        z[3:7,:] = -z[3:7,:]
-    z = z.T # solution arranged so that it is [time, state_dim]
-    return z
-
-def compute_controls(z):
-    """
-    This function computes the controls V, om, given the state z. It is used in main().
-    Input:
-        z: z is the state vector for multiple time instances. It has size [time, state_dim]
-    Outputs:
-        V: velocity control input
-        om: angular rate control input
-    """
-    ########## Code starts here ##########
+def optimize_trajectory(time_weight=1.0, verbose=True):
+    """Computes the optimal trajectory as a function of `time_weight`.
     
-    ########## Code ends here ##########
+    Args:
+        time_weight: \lambda in the HW writeup.
 
-    return V, om
-
-def main():
+    Returns:
+        t_f_opt: Optimal final time, a scalar.
+        s_opt: Optimal states, an array of shape (N + 1, s_dim).
+        u_opt: Optimal controls, an array of shape (N, u_dim).
     """
-    This function solves the specified bvp problem and returns the corresponding optimal contol sequence
-    Outputs:
-        V: optimal V control sequence 
-        om: optimal om ccontrol sequence
-    You are required to define the problem inputs, initial guess, and compute the controls
 
-    Hint: The total time is between 15-25
-    """
-    ########## Code starts here ##########
-    
-    ########## Code ends here ##########
+    # NOTE: When using `minimize`, you may find the utilities
+    # `pack_decision_variables` and `unpack_decision_variables` useful.
 
-    problem_inputs = {
-                      'num_ODE' : num_ODE,
-                      'num_parameters' : num_parameters,
-                      'num_left_boundary_conditions' : num_left_boundary_conditions,
-                      'boundary_points' : boundary_points,
-                      'function' : function,
-                      'boundary_conditions' : boundary_conditions
-                     }
+    # WRITE YOUR CODE BELOW ###################################################
+    raise NotImplementedError
+    ###########################################################################
 
-    z = solve_bvp(problem_inputs, initial_guess)
-    V, om = compute_controls(z)
-    return z, V, om
 
 if __name__ == '__main__':
-    z, V, om = main()
-    tf = z[0,-1]
-    t = np.arange(0,tf,dt)
-    x = z[:,0]
-    y = z[:,1]
-    th = z[:,2]
-    data = {'z': z, 'V': V, 'om': om}
-    save_dict(data, 'data/optimal_control.pkl')
-    maybe_makedirs('plots')
+    for time_weight in (1.0, 0.2):
+        t_f, s, u = optimize_trajectory(time_weight)
+        V = u[:, 0]
+        om = u[:, 1]
+        t = np.linspace(0, t_f, N + 1)[:-1]
+        x = s[:, 0]
+        y = s[:, 1]
+        th = s[:, 2]
+        data = {'t_f': t_f, 's': s, 'u': u}
+        save_dict(data, f'data/optimal_control_{time_weight}.pkl')
+        maybe_makedirs('plots')
 
-    # plotting
-    # plt.rc('font', weight='bold', size=16)
-    plt.figure(figsize=(12, 4))
-    plt.subplot(1, 2, 1)
-    plt.plot(x, y,'k-',linewidth=2)
-    plt.quiver(x[1:-1:200], y[1:-1:200],np.cos(th[1:-1:200]),np.sin(th[1:-1:200]))
-    plt.grid('on')
-    plt.plot(0,0,'go',markerfacecolor='green',markersize=15)
-    plt.plot(5,5,'ro',markerfacecolor='red', markersize=15)
-    plt.xlabel('X [m]')
-    plt.ylabel('Y [m]')
-    plt.axis([-1, 6, -1, 6])
-    plt.title('Optimal Control Trajectory')
+        # plotting
+        # plt.rc('font', weight='bold', size=16)
+        plt.figure(figsize=(12, 4))
+        plt.subplot(1, 2, 1)
+        plt.plot(x, y, 'k-', linewidth=2)
+        plt.quiver(x, y, np.cos(th), np.sin(th))
+        plt.grid(True)
+        plt.plot(0, 0, 'go', markerfacecolor='green', markersize=15)
+        plt.plot(5, 5, 'ro', markerfacecolor='red', markersize=15)
+        plt.xlabel('X [m]')
+        plt.ylabel('Y [m]')
+        plt.axis([-1, 6, -1, 6])
+        plt.title(f'Optimal Control Trajectory (lambda = {time_weight})')
 
-    plt.subplot(1, 2, 2)
-    plt.plot(t, V,linewidth=2)
-    plt.plot(t, om,linewidth=2)
-    plt.grid('on')
-    plt.xlabel('Time [s]')
-    plt.legend(['V [m/s]', '$\omega$ [rad/s]'], loc='best')
-    plt.title('Optimal control sequence')
-    plt.tight_layout()
-    plt.savefig('plots/optimal_control.png')
-    plt.show()
+        plt.subplot(1, 2, 2)
+        plt.plot(t, V, linewidth=2)
+        plt.plot(t, om, linewidth=2)
+        plt.grid(True)
+        plt.xlabel('Time [s]')
+        plt.legend(['V [m/s]', '$\omega$ [rad/s]'], loc='best')
+        plt.title(f'Optimal control sequence (lambda = {time_weight})')
+        plt.tight_layout()
+        plt.savefig(f'plots/optimal_control_{time_weight}.png')
+        plt.show()

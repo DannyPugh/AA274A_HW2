@@ -33,34 +33,7 @@ def compute_traj_coeffs(initial_state, final_state, tf):
     Hint: Use the np.linalg.solve function.
     """
     ########## Code starts here ##########
-    #for each element in arrray
-    ti = 0
-    A = np.array([
-        [1 ,ti  ,ti**2  ,ti**3   ,0  ,0  ,0      ,0      ], 
-        [0  ,1  ,2*ti   ,3*ti**2 ,0  ,0  ,0      ,0      ], 
-        [0  ,0  ,0      ,0       ,1  ,ti ,ti**2  ,ti**3  ], 
-        [0  ,0  ,0      ,0       ,0  ,1  ,2*ti   ,3*ti**2],
-        [1 ,tf  ,tf**2  ,tf**3   ,0  ,0  ,0      ,0      ], 
-        [0  ,1  ,2*tf   ,3*tf**2 ,0  ,0  ,0      ,0      ], 
-        [0  ,0  ,0      ,0       ,1  ,tf ,tf**2  ,tf**3  ], 
-        [0  ,0  ,0      ,0       ,0  ,1  ,2*tf   ,3*tf**2],
-    ])
 
-    B = np.array(
-        [
-        initial_state.x, 
-        initial_state.V*np.cos(initial_state.th), 
-        initial_state.y, 
-        initial_state.V*np.sin(initial_state.th), 
-        final_state.x, 
-        final_state.V*np.cos(final_state.th), 
-        final_state.y, 
-        final_state.V*np.sin(final_state.th)
-        ]
-    )
-
-    coeffs = np.linalg.solve(A,B)
-    # coeffs components in order [x1,x2,x3,x4,y1,y2,y3,y4]
     ########## Code ends here ##########
     return coeffs
 
@@ -77,30 +50,7 @@ def compute_traj(coeffs, tf, N):
     t = np.linspace(0,tf,N) # generate evenly spaced points from 0 to tf
     traj = np.zeros((N,7))
     ########## Code starts here ##########
-    #unpack coeff
-    x1 = coeffs[0]
-    x2 = coeffs[1]
-    x3 = coeffs[2]
-    x4 = coeffs[3]
-    y1 = coeffs[4]
-    y2 = coeffs[5]
-    y3 = coeffs[6]
-    y4 = coeffs[7]
-
-    for index in range(0,len(t)):
-        time = t[index]
-        #computer state trajectory components
-        x   = x1    + x2*time   + x3*time**2    + x4*time**3
-        xd  = 0     + x2        + 2*x3*time     + 3*x4*time**2
-        xdd = 0     + 0         + 2*x3          + 6*x4*time
-        y   = y1    + y2*time   + y3*time**2    + y4*time**3
-        yd  = 0     + y2        + 2*y3*time     + 3*y4*time**2
-        ydd = 0     + 0         + 2*y3          + 6*y4*time
-        th  = np.arctan2(yd, xd)
-        #pack up
-        #how to properly pack these values???
-        components = np.array([x,y,th,xd,yd,xdd,ydd])
-        traj[index,:] = components     
+    
     ########## Code ends here ##########
 
     return t, traj
@@ -114,40 +64,9 @@ def compute_controls(traj):
         om (np.array shape [N]) om at each point of traj
     """
     ########## Code starts here ##########
-    V = np.zeros(len(traj))
-    om = np.zeros(len(traj))
-
-    for index in range(0,len(traj)):
-        #unpack
-        x   = traj[index, 0]
-        y   = traj[index, 1]
-        th  = traj[index, 2]
-        xd  = traj[index, 3]
-        yd  = traj[index, 4]
-        xdd = traj[index, 5]
-        ydd = traj[index, 6]
-        #compute velocity
-        Vel = np.sqrt(xd**2 + yd**2)
-        #computer J
-        J = np.array(
-            [
-            [np.cos(th),   -Vel*np.sin(th)],
-            [np.sin(th),    Vel*np.cos(th)]
-            ]
-                    )
-        #define control variables vector
-        controls = np.array([xdd, ydd])
-        #compute J inverse as invJ
-        invJ = np.linalg.inv(J)
-        u = np.linalg.solve(J,controls)
-        omega = u[1]
-        #add omega and vel to om and V matrix
-        V[index] = Vel
-        om[index] = omega
-
+    
     ########## Code ends here ##########
 
-    
     return V, om
 
 def compute_arc_length(V, t):
@@ -162,9 +81,8 @@ def compute_arc_length(V, t):
 
     Hint: Use the function cumtrapz. This should take one line.
     """
-    s = None
     ########## Code starts here ##########
-    s = cumtrapz(V, t, initial = 0)
+    
     ########## Code ends here ##########
     return s
 
@@ -185,15 +103,7 @@ def rescale_V(V, om, V_max, om_max):
     Hint: This should only take one or two lines.
     """
     ########## Code starts here ##########
-    V_tilde = np.zeros(len(V))
-    for index in range(0,len(V)):
-        Vi = abs(V[index])
-        omi = abs(om[index])
-        if omi <= 0:
-            omi = 10**-5
-        Vp = min(Vi, V_max)
-        Vomp = min(omi, om_max)*Vi/omi
-        V_tilde[index] = min(Vp, Vomp)
+    
     ########## Code ends here ##########
     return V_tilde
 
@@ -210,7 +120,7 @@ def compute_tau(V_tilde, s):
     Hint: Use the function cumtrapz. This should take one line.
     """
     ########## Code starts here ##########
-    tau = cumtrapz(1/V_tilde, s, initial = 0)
+    
     ########## Code ends here ##########
     return tau
 
@@ -227,9 +137,7 @@ def rescale_om(V, om, V_tilde):
     Hint: This should take one line.
     """
     ########## Code starts here ##########
-    om_tilde = np.zeros(len(V))
-    for index in range(0,len(V)):
-        om_tilde[index] = V_tilde[index]*om[index]/V[index]
+    
     ########## Code ends here ##########
     return om_tilde
 
@@ -300,7 +208,6 @@ if __name__ == "__main__":
 
     # Final conditions
     s_f = State(x=5, y=5, V=V_max, th=-np.pi/2)
-    #s_f = State(x=5, y=5, V=0, th=-np.pi/2)
 
     coeffs = compute_traj_coeffs(initial_state=s_0, final_state=s_f, tf=tf)
     t, traj = compute_traj(coeffs=coeffs, tf=tf, N=N)
@@ -326,7 +233,7 @@ if __name__ == "__main__":
     plt.figure(figsize=(15, 7))
     plt.subplot(2, 2, 1)
     plt.plot(traj[:,0], traj[:,1], 'k-',linewidth=2)
-    plt.grid(True)
+    plt.grid('on')
     plt.plot(s_0.x, s_0.y, 'go', markerfacecolor='green', markersize=15)
     plt.plot(s_f.x, s_f.y, 'ro', markerfacecolor='red', markersize=15)
     plt.xlabel('X [m]')
@@ -337,7 +244,7 @@ if __name__ == "__main__":
     ax = plt.subplot(2, 2, 2)
     plt.plot(t, V, linewidth=2)
     plt.plot(t, om, linewidth=2)
-    plt.grid(True)
+    plt.grid('on')
     plt.xlabel('Time [s]')
     plt.legend(['V [m/s]', '$\omega$ [rad/s]'], loc="best")
     plt.title('Original Control Input')
@@ -348,7 +255,7 @@ if __name__ == "__main__":
         plt.plot(t_new, V_scaled, linewidth=2)
         plt.plot(t_new, om_scaled, linewidth=2)
         plt.legend(['V [m/s]', '$\omega$ [rad/s]'], loc="best")
-        plt.grid(True)
+        plt.grid('on')
     else:
         plt.text(0.5,0.5,"[Problem iv not completed]", horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
     plt.xlabel('Time [s]')
@@ -366,7 +273,7 @@ if __name__ == "__main__":
         plt.legend(handles, labels, loc="best")
     else:
         plt.text(0.5,0.5,"[Problem iv not completed]", horizontalalignment='center', verticalalignment='center', transform=plt.gca().transAxes)
-    plt.grid(True)
+    plt.grid('on')
     plt.xlabel('Time [s]')
     plt.ylabel('Arc-length [m]')
     plt.title('Original and scaled arc-length')

@@ -34,29 +34,7 @@ class PoseController:
         may also be useful, look up its documentation
         """
         ########## Code starts here ##########
-        x_g = self.x_g
-        y_g = self.y_g
-        th_g = self.th_g
-
-        #xp = x - x_g
-        #yp = y - y_g
-
-        xp = x_g - x
-        yp = y_g - y
-
-        rho = np.sqrt(xp**2 + yp**2)
-        alpha = wrapToPi(np.arctan2(yp, xp)-th)
-        #alpha = wrapToPi(np.pi-(th - np.arctan2(yp, xp)))
-        delta = wrapToPi(np.arctan2(yp, xp)-th_g)
-
-
-        k1 = self.k1
-        k2 = self.k2
-        k3 = self.k3
-
-        #??? How to impliment np.sinc(alpha) ???
-        V = k1*rho*np.cos(alpha)
-        om = k2*alpha + k1*np.sinc(alpha/np.pi)*np.cos(alpha)*(alpha + k3*delta)
+        
         ########## Code ends here ##########
 
         # apply control limits
